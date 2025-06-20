@@ -5,6 +5,7 @@ import "./App.css";
 import helloworld_program from "../helloworld/build/main.aleo?raw";
 import { AleoWorker } from "./workers/AleoWorker";
 import SimpleDice from "./components/SimpleDice";
+import ProfessionalDice from "./components/ProfessionalDice";
 
 const aleoWorker = AleoWorker();
 function App() {
@@ -99,7 +100,13 @@ function App() {
       </p>
 
       <div className="card">
+        <h2>Dice Simulators</h2>
         <SimpleDice />
+      </div>
+
+      <div className="card">
+        <h2>Professional Dice (CodePen Style)</h2>
+        <ProfessionalDice />
       </div>
     </>
   );
