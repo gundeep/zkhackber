@@ -4,6 +4,7 @@ import aleoLogo from "./assets/aleo.svg";
 import "./App.css";
 import helloworld_program from "../helloworld/build/main.aleo?raw";
 import { AleoWorker } from "./workers/AleoWorker";
+import SimpleDice from "./components/SimpleDice";
 
 const aleoWorker = AleoWorker();
 function App() {
@@ -96,6 +97,10 @@ function App() {
       <p className="read-the-docs">
         Click on the Aleo and React logos to learn more
       </p>
+
+      <div className="card">
+        <SimpleDice />
+      </div>
     </>
   );
 }
