@@ -4,7 +4,6 @@ import aleoLogo from "./assets/aleo.svg";
 import "./App.css";
 import helloworld_program from "../helloworld/build/main.aleo?raw";
 import { AleoWorker } from "./workers/AleoWorker";
-import SimpleDice from "./components/SimpleDice";
 import ProfessionalDice from "./components/ProfessionalDice";
 
 const aleoWorker = AleoWorker();
@@ -99,13 +98,13 @@ function App() {
         Click on the Aleo and React logos to learn more
       </p>
 
+      {/* Dice Simulator Section */}
       <div className="card">
-        <h2>Dice Simulators</h2>
-        <SimpleDice />
-      </div>
-
-      <div className="card">
-        <h2>Professional Dice (CodePen Style)</h2>
+        <h2>🎲 Professional Dice Simulator</h2>
+        <p className="text-sm text-gray-600 mb-6">
+          Three.js-based dice rolling implementation with realistic physics and custom geometry
+        </p>
+        
         <ProfessionalDice />
       </div>
     </>
