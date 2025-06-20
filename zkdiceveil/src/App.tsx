@@ -45,69 +45,117 @@ function App() {
   }
 
   return (
-    <>
-      <div>
-        <a href="https://provable.com" target="_blank">
-          <img src={aleoLogo} className="logo" alt="Aleo logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Aleo + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          <button onClick={generateAccount}>
-            {account
-              ? `Account private key is ${JSON.stringify(account)}`
-              : `Click to generate account`}
-          </button>
-        </p>
-        <p>
-          <button disabled={executing} onClick={execute}>
-            {executing
-              ? `Executing...check console for details...`
-              : `Execute helloworld.aleo`}
-          </button>
-        </p>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      {/* Header */}
+      <header className="bg-white shadow-lg border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-3">
+                <img src={aleoLogo} className="h-10 w-10" alt="Aleo logo" />
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">ZKDiceVeil</h1>
+                  <p className="text-sm text-slate-600">Aleo-Powered Dice Simulator</p>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-6">
+              <a 
+                href="https://provable.com" 
+                target="_blank"
+                className="text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Aleo Network
+              </a>
+              <a 
+                href="https://react.dev" 
+                target="_blank"
+                className="flex items-center space-x-2 text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                <img src={reactLogo} className="h-5 w-5" alt="React logo" />
+                <span>React</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </header>
 
-      {/* Advanced Section */}
-      <div className="card">
-        <h2>Advanced Actions</h2>
-        <p>
-          Deployment on Aleo requires certain prerequisites like seeding your
-          wallet with credits and retrieving a fee record. Check README for more
-          details.
-        </p>
-        <p>
-          <button disabled={deploying} onClick={deploy}>
-            {deploying
-              ? `Deploying...check console for details...`
-              : `Deploy helloworld.aleo`}
-          </button>
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Aleo and React logos to learn more
-      </p>
-
-      {/* Dice Simulator Section */}
-      <div className="card">
-        <h2>🎲 Professional Dice Simulator</h2>
-        <p className="text-sm text-gray-600 mb-6">
-          Three.js-based dice rolling implementation with realistic physics and custom geometry
-        </p>
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        <ProfessionalDice />
-      </div>
-    </>
+        {/* Dice Simulator */}
+        <div className="mb-16">
+          <ProfessionalDice />
+        </div>
+
+        {/* Aleo Demo Section */}
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <h3 className="text-2xl font-bold text-slate-900 mb-6 text-center">
+            Aleo Blockchain Integration
+          </h3>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center">
+              <button 
+                onClick={() => setCount((count) => count + 1)}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg font-semibold transition-colors"
+              >
+                Count: {count}
+              </button>
+              <p className="text-sm text-slate-600 mt-2">Demo Counter</p>
+            </div>
+            
+            <div className="text-center">
+              <button 
+                onClick={generateAccount}
+                className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-lg font-semibold transition-colors"
+              >
+                {account ? '✓ Account Generated' : 'Generate Account'}
+              </button>
+              <p className="text-sm text-slate-600 mt-2">Aleo Account</p>
+            </div>
+            
+            <div className="text-center">
+              <button 
+                disabled={executing} 
+                onClick={execute}
+                className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white px-4 py-3 rounded-lg font-semibold transition-colors"
+              >
+                {executing ? 'Executing...' : 'Execute Program'}
+              </button>
+              <p className="text-sm text-slate-600 mt-2">Run Aleo Code</p>
+            </div>
+            
+            <div className="text-center">
+              <button 
+                disabled={deploying} 
+                onClick={deploy}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-4 py-3 rounded-lg font-semibold transition-colors"
+              >
+                {deploying ? 'Deploying...' : 'Deploy Contract'}
+              </button>
+              <p className="text-sm text-slate-600 mt-2">Blockchain Deploy</p>
+            </div>
+          </div>
+
+          {account && (
+            <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+              <p className="text-sm text-slate-600 mb-2">Generated Account:</p>
+              <code className="text-xs text-slate-800 break-all">{account}</code>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-white py-8 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p className="text-slate-400">
+            Built with ❤️ using Aleo, React, and Three.js
+          </p>
+        </div>
+      </footer>
+    </div>
   );
 }
 

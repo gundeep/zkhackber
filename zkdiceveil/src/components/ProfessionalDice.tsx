@@ -280,139 +280,187 @@ export default function ProfessionalDice() {
   const allSettled = results.length === diceCount && results.every(r => r > 0);
 
   return (
-    <div className="w-full bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl shadow-2xl overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-6">
-        <h2 className="text-2xl font-bold text-center">🎲 Professional Dice Simulator</h2>
-        <p className="text-slate-300 text-center mt-2">Realistic physics-based dice rolling with custom geometry</p>
+    <div className="relative w-full h-screen bg-gradient-to-b from-gray-900 to-black overflow-hidden">
+      {/* Full Screen 3D Canvas */}
+      <Canvas
+        shadows
+        camera={{ position: [0, 4, 8], fov: 65 }}
+        gl={{ antialias: true }}
+        className="w-full h-full"
+      >
+        <color attach="background" args={['#0a0a0a']} />
+        
+        <ambientLight intensity={0.4} />
+        <directionalLight
+          position={[12, 12, 8]}
+          intensity={1.2}
+          castShadow
+          shadow-mapSize-width={4096}
+          shadow-mapSize-height={4096}
+        />
+        <pointLight position={[-8, 12, 8]} intensity={1} color="#ffffff" />
+        <pointLight position={[8, 8, -8]} intensity={0.6} color="#4a90e2" />
+        
+        <Physics gravity={[0, -30, 0]} allowSleep={true}>
+          {Array.from({ length: diceCount }, (_, i) => (
+            <ProfessionalDiceSingle
+              key={i}
+              id={i}
+              position={[i * 1.5 - (diceCount - 1) * 0.75, 4, 0]}
+              rolling={rolling}
+              onResult={(result) => handleResult(result, i)}
+            />
+          ))}
+          <Floor />
+        </Physics>
+
+        <OrbitControls 
+          enablePan={false}
+          minDistance={4}
+          maxDistance={25}
+          maxPolarAngle={Math.PI / 2.1}
+          enableDamping={true}
+          dampingFactor={0.05}
+        />
+        <Environment preset="city" />
+      </Canvas>
+      
+      {/* Floating Controls Panel - Top Left */}
+      <div className="absolute top-6 left-6 bg-black/90 backdrop-blur-md text-white p-6 rounded-2xl shadow-2xl border border-white/20 min-w-80">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+          <h2 className="text-xl font-bold ml-4">🎲 Professional Dice</h2>
+        </div>
+        
+        {/* Dice Count Control */}
+        <div className="mb-6">
+          <label className="block text-white/90 font-semibold mb-3">
+            Number of Dice: <span className="text-blue-400">{diceCount}</span>
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="6"
+            value={diceCount}
+            onChange={(e) => setDiceCount(parseInt(e.target.value))}
+            className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer slider"
+            disabled={rolling}
+          />
+          <div className="flex justify-between text-xs text-white/60 mt-1">
+            <span>1</span>
+            <span>6</span>
+          </div>
+        </div>
+
+        {/* Roll Button */}
+        <button
+          onClick={handleRoll}
+          disabled={rolling}
+          className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-600 disabled:to-gray-700 text-white px-6 py-4 rounded-xl font-bold text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none disabled:hover:scale-100 mb-4"
+        >
+          {rolling ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="animate-spin">🎲</span>
+              Rolling...
+            </span>
+          ) : (
+            <span className="flex items-center justify-center gap-2">
+              🎲 Roll Dice
+            </span>
+          )}
+        </button>
+
+        {/* Results Display */}
+        {allSettled && (
+          <div className="bg-gradient-to-r from-green-900/50 to-emerald-900/50 border border-green-400/30 p-4 rounded-xl backdrop-blur-sm">
+            <div className="text-green-300 font-semibold mb-3">🎯 Results:</div>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {results.map((result, i) => (
+                <div key={i} className="bg-white/20 border border-green-300/50 text-center py-2 px-3 rounded-lg font-bold text-lg text-white backdrop-blur-sm">
+                  {result}
+                </div>
+              ))}
+            </div>
+            <div className="bg-white/20 border-2 border-green-400/50 text-center py-3 px-4 rounded-lg backdrop-blur-sm">
+              <div className="text-sm text-green-300 mb-1">Total</div>
+              <div className="text-2xl font-bold text-green-400">{totalResult}</div>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-col lg:flex-row">
-        {/* 3D Viewport */}
-        <div className="flex-1 relative">
-          <div className="h-[500px] bg-gradient-to-b from-gray-800 to-black">
-            <Canvas
-              shadows
-              camera={{ position: [0, 5, 8], fov: 50 }}
-              gl={{ antialias: true }}
-            >
-              <color attach="background" args={['#1a1a1a']} />
-              
-              <ambientLight intensity={0.3} />
-              <directionalLight
-                position={[10, 10, 5]}
-                intensity={1}
-                castShadow
-                shadow-mapSize-width={2048}
-                shadow-mapSize-height={2048}
-              />
-              <pointLight position={[-5, 10, 5]} intensity={0.8} color="#ffffff" />
-              
-              <Physics gravity={[0, -25, 0]} allowSleep={true}>
-                {Array.from({ length: diceCount }, (_, i) => (
-                  <ProfessionalDiceSingle
-                    key={i}
-                    id={i}
-                    position={[i * 1.2 - (diceCount - 1) * 0.6, 5, 0]}
-                    rolling={rolling}
-                    onResult={(result) => handleResult(result, i)}
-                  />
-                ))}
-                <Floor />
-              </Physics>
-
-              <OrbitControls 
-                enablePan={false}
-                minDistance={3}
-                maxDistance={15}
-                maxPolarAngle={Math.PI / 2}
-              />
-              <Environment preset="warehouse" />
-            </Canvas>
+      {/* Large Sum Display - Top Center */}
+      {allSettled && (
+        <div className="absolute top-6 left-1/2 transform -translate-x-1/2 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 backdrop-blur-md text-white p-8 rounded-3xl shadow-2xl border-4 border-yellow-300 animate-pulse">
+          <div className="text-center">
+            <div className="text-lg font-bold text-yellow-100 mb-3 uppercase tracking-wider">🎲 DICE TOTAL 🎲</div>
+            <div className="text-8xl font-black text-white mb-3 drop-shadow-2xl">{totalResult}</div>
+            <div className="text-lg text-yellow-100 font-semibold">
+              {results.join(' + ')} = {totalResult}
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Always Visible Sum Display - Bottom Center */}
+      <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/90 backdrop-blur-md text-white p-6 rounded-2xl shadow-2xl border-2 border-blue-400/50 min-w-80">
+        <div className="text-center">
+          <div className="text-blue-300 font-semibold mb-3">🎯 Current Results</div>
           
-          {/* Status overlay */}
-          {rolling && (
-            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-              <div className="bg-black/80 text-white px-6 py-3 rounded-lg text-xl font-bold">
-                🎲 Rolling Dice...
+          {results.length > 0 ? (
+            <div>
+              <div className="flex justify-center gap-3 mb-4">
+                {Array.from({ length: diceCount }, (_, i) => (
+                  <div key={i} className={`w-12 h-12 rounded-lg border-2 flex items-center justify-center font-bold text-lg ${
+                    results[i] ? 'bg-green-500/80 border-green-300 text-white' : 'bg-gray-600/50 border-gray-400 text-gray-300'
+                  }`}>
+                    {results[i] || '?'}
+                  </div>
+                ))}
               </div>
+              
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-center py-4 px-6 rounded-xl">
+                <div className="text-sm text-blue-200 mb-2">TOTAL SUM</div>
+                <div className="text-4xl font-bold text-white">{totalResult}</div>
+                {allSettled && (
+                  <div className="text-sm text-blue-200 mt-2">
+                    {results.join(' + ')} = {totalResult}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="text-gray-400 py-4">
+              Roll the dice to see results!
             </div>
           )}
         </div>
+      </div>
 
-        {/* Controls Panel */}
-        <div className="lg:w-80 bg-white border-l border-slate-200">
-          <div className="p-6 space-y-6">
-            {/* Dice Count Control */}
-            <div className="bg-slate-50 p-4 rounded-lg">
-              <label className="block text-slate-700 font-semibold mb-3">
-                Number of Dice: <span className="text-blue-600">{diceCount}</span>
-              </label>
-              <input
-                type="range"
-                min="1"
-                max="6"
-                value={diceCount}
-                onChange={(e) => setDiceCount(parseInt(e.target.value))}
-                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer slider"
-                disabled={rolling}
-              />
-              <div className="flex justify-between text-xs text-slate-500 mt-1">
-                <span>1</span>
-                <span>6</span>
-              </div>
-            </div>
+      {/* Floating Instructions Panel - Bottom Right */}
+      <div className="absolute bottom-6 right-6 bg-black/80 backdrop-blur-md text-white p-4 rounded-xl border border-white/20">
+        <div className="text-blue-300 font-semibold mb-2">💡 Controls:</div>
+        <ul className="text-sm text-white/80 space-y-1">
+          <li>• Drag to rotate view</li>
+          <li>• Scroll to zoom</li>
+          <li>• Adjust dice count</li>
+          <li>• Click roll to play</li>
+        </ul>
+      </div>
 
-            {/* Roll Button */}
-            <button
-              onClick={handleRoll}
-              disabled={rolling}
-              className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-6 py-4 rounded-lg font-bold text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none disabled:hover:scale-100"
-            >
-              {rolling ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="animate-spin">🎲</span>
-                  Rolling...
-                </span>
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  🎲 Roll Dice
-                </span>
-              )}
-            </button>
-
-            {/* Results Display */}
-            {allSettled && (
-              <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 p-4 rounded-lg">
-                <div className="text-slate-700 font-semibold mb-3">🎯 Results:</div>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  {results.map((result, i) => (
-                    <div key={i} className="bg-white border border-green-300 text-center py-2 px-3 rounded font-bold text-lg text-slate-800 shadow-sm">
-                      {result}
-                    </div>
-                  ))}
-                </div>
-                <div className="bg-white border-2 border-green-400 text-center py-3 px-4 rounded-lg">
-                  <div className="text-sm text-slate-600 mb-1">Total</div>
-                  <div className="text-2xl font-bold text-green-600">{totalResult}</div>
-                </div>
-              </div>
-            )}
-
-            {/* Instructions */}
-            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
-              <div className="text-blue-800 font-semibold mb-2">💡 How to Use:</div>
-              <ul className="text-sm text-blue-700 space-y-1">
-                <li>• Adjust dice count with slider</li>
-                <li>• Click "Roll Dice" to start</li>
-                <li>• Drag to rotate camera view</li>
-                <li>• Scroll to zoom in/out</li>
-              </ul>
-            </div>
+      {/* Rolling Status Overlay */}
+      {rolling && (
+        <div className="absolute inset-0 bg-black/20 flex items-center justify-center pointer-events-none">
+          <div className="bg-black/90 backdrop-blur-md text-white px-8 py-4 rounded-2xl text-2xl font-bold border border-white/20">
+            <span className="flex items-center gap-3">
+              <span className="animate-spin text-3xl">🎲</span>
+              Rolling Dice...
+            </span>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 } 
