@@ -162,14 +162,22 @@ function ProfessionalDiceSingle({ position, rolling, onResult, id }: Professiona
       ];
       api.rotation.set(randomRotation[0], randomRotation[1], randomRotation[2]);
       
-      // Apply gentle impulse with delay
+      // Apply realistic impulse with delay
       setTimeout(() => {
-        const force = 3 + 5 * Math.random();
-        const impulse: [number, number, number] = [-force, force, 0];
-        const point: [number, number, number] = [0, 0, 0.2];
+        const forceX = (Math.random() - 0.5) * 3;
+        const forceY = 8 + Math.random() * 4;
+        const forceZ = (Math.random() - 0.5) * 3;
         
-        api.applyImpulse(impulse, point);
-      }, id * 100);
+        const impulse: [number, number, number] = [forceX, forceY, forceZ];
+        const torque: [number, number, number] = [
+          (Math.random() - 0.5) * 8,
+          (Math.random() - 0.5) * 8,
+          (Math.random() - 0.5) * 8
+        ];
+        
+        api.applyImpulse(impulse, [0, 0, 0]);
+        api.applyTorque(torque);
+      }, id * 150);
     }
   }, [rolling, api, id]);
 
@@ -196,8 +204,12 @@ function ProfessionalDiceSingle({ position, rolling, onResult, id }: Professiona
 
   return (
     <group ref={ref}>
-      <mesh geometry={diceGeometry.current}>
-        <meshStandardMaterial color={0xeeeeee} />
+      <mesh geometry={diceGeometry.current} castShadow receiveShadow>
+        <meshStandardMaterial 
+          color="#fafafa" 
+          roughness={0.05}
+          metalness={0.02}
+        />
       </mesh>
       <mesh geometry={innerGeometry.current}>
         <meshStandardMaterial 
@@ -290,16 +302,30 @@ export default function ProfessionalDice() {
       >
         <color attach="background" args={['#0a0a0a']} />
         
-        <ambientLight intensity={0.4} />
+        <ambientLight intensity={0.3} />
         <directionalLight
-          position={[12, 12, 8]}
-          intensity={1.2}
+          position={[10, 15, 10]}
+          intensity={1.5}
           castShadow
           shadow-mapSize-width={4096}
           shadow-mapSize-height={4096}
+          shadow-camera-far={25}
+          shadow-camera-left={-10}
+          shadow-camera-right={10}
+          shadow-camera-top={10}
+          shadow-camera-bottom={-10}
         />
-        <pointLight position={[-8, 12, 8]} intensity={1} color="#ffffff" />
-        <pointLight position={[8, 8, -8]} intensity={0.6} color="#4a90e2" />
+        <pointLight position={[-10, 8, 10]} intensity={0.8} color="#ffffff" />
+        <pointLight position={[10, 8, -8]} intensity={0.5} color="#4a90e2" />
+        <spotLight 
+          position={[0, 15, 0]} 
+          intensity={0.7}
+          angle={0.4}
+          penumbra={0.5}
+          castShadow
+          shadow-mapSize-width={2048}
+          shadow-mapSize-height={2048}
+        />
         
         <Physics gravity={[0, -30, 0]} allowSleep={true}>
           {Array.from({ length: diceCount }, (_, i) => (

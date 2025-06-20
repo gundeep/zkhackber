@@ -13,6 +13,11 @@
   },
   "dependencies": {
     "@provablehq/sdk": "^0.9.2",
+    "@react-three/cannon": "^6.6.0",
+    "@react-three/drei": "^10.3.0",
+    "@react-three/rapier": "^2.1.0",
+    "@types/three": "^0.177.0",
+    "cannon-es": "^0.20.0",
     "comlink": "^4.4.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
