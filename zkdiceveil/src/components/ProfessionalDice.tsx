@@ -145,10 +145,13 @@ function ProfessionalDiceSingle({ position, rolling, onResult, id }: Professiona
   const [settled, setSettled] = useState(false);
   const diceGeometry = useRef(createDiceGeometry());
   const innerGeometry = useRef(createInnerGeometry());
+  const currentRotation = useRef<[number, number, number]>([0, 0, 0]);
+  const meshRef = useRef<THREE.Mesh>(null);
 
   useEffect(() => {
     if (rolling) {
       setSettled(false);
+      console.log(`Dice ${id} starting new roll, resetting state`);
       
       // Reset velocity
       api.velocity.set(0, 0, 0);
@@ -178,33 +181,67 @@ function ProfessionalDiceSingle({ position, rolling, onResult, id }: Professiona
         api.applyImpulse(impulse, [0, 0, 0]);
         api.applyTorque(torque);
       }, id * 150);
+
+      // Fallback timeout - ensure dice settles after 5 seconds
+      const fallbackTimeout = setTimeout(() => {
+        if (!settled) {
+          console.log(`Dice ${id} forced to settle after timeout`);
+          const randomResult = Math.floor(Math.random() * 6) + 1;
+          setSettled(true);
+          onResult(randomResult);
+        }
+      }, 5000);
+
+      return () => clearTimeout(fallbackTimeout);
     }
-  }, [rolling, api, id]);
+  }, [rolling, api, id, settled, onResult]);
+
+  // Track rotation changes
+  useEffect(() => {
+    const unsubscribeRotation = api.rotation.subscribe((rotation) => {
+      currentRotation.current = rotation;
+    });
+    return unsubscribeRotation;
+  }, [api]);
 
   // Sleep event listener for result detection
   useEffect(() => {
+    let hasReported = false; // Flag to ensure we only report once per roll
+    
     const unsubscribe = api.velocity.subscribe((velocity) => {
-      if (rolling && !settled) {
+      if (rolling && !settled && !hasReported) {
         const speed = Math.sqrt(velocity[0] ** 2 + velocity[1] ** 2 + velocity[2] ** 2);
+        console.log(`Dice ${id} speed: ${speed.toFixed(3)}`);
         if (speed < 0.1) {
-          // Get rotation and determine face
-          api.rotation.subscribe((rotation) => {
-            const result = getFaceFromRotation(rotation);
-            if (result > 0) {
-              setSettled(true);
-              onResult(result);
-            }
-          })();
+          console.log(`Dice ${id} settled, checking rotation...`);
+          hasReported = true; // Mark as reported to prevent multiple calls
+          
+          // Use a timeout to ensure the rotation has stabilized
+                      setTimeout(() => {
+              if (!settled) { // Double-check we haven't already settled
+                const rotation = currentRotation.current;
+                console.log(`Dice ${id} rotation:`, rotation);
+                
+                const result = getFaceFromRotation(rotation, meshRef.current || undefined);
+                console.log(`Dice ${id} face result: ${result}`);
+                
+                if (result > 0) {
+                  console.log(`Dice ${id} final result: ${result}`);
+                  setSettled(true);
+                  onResult(result);
+                }
+              }
+            }, 100); // Small delay to ensure rotation has stabilized
         }
       }
     });
 
     return unsubscribe;
-  }, [rolling, settled, api, onResult]);
+  }, [rolling, settled, api, onResult, id]);
 
   return (
     <group ref={ref}>
-      <mesh geometry={diceGeometry.current} castShadow receiveShadow>
+      <mesh ref={meshRef} geometry={diceGeometry.current} castShadow receiveShadow>
         <meshStandardMaterial 
           color="#fafafa" 
           roughness={0.05}
@@ -224,27 +261,54 @@ function ProfessionalDiceSingle({ position, rolling, onResult, id }: Professiona
 }
 
 // Helper function to determine dice face from rotation
-function getFaceFromRotation(rotation: [number, number, number]): number {
-  const [x, y, z] = rotation;
-  const eps = 0.1;
+function getFaceFromRotation(rotation: [number, number, number], mesh?: THREE.Mesh): number {
+  // Define the face normals for a standard dice
+  // These correspond to the faces created in the dice geometry
+  const faceNormals = [
+    new THREE.Vector3(0, 1, 0),   // Face 1 (top) - 1 dot
+    new THREE.Vector3(1, 0, 0),   // Face 2 (right) - 2 dots  
+    new THREE.Vector3(0, 0, 1),   // Face 3 (front) - 3 dots
+    new THREE.Vector3(0, 0, -1),  // Face 4 (back) - 4 dots
+    new THREE.Vector3(-1, 0, 0),  // Face 5 (left) - 5 dots
+    new THREE.Vector3(0, -1, 0),  // Face 6 (bottom) - 6 dots
+  ];
   
-  const isZero = (angle: number) => Math.abs(angle) < eps;
-  const isHalfPi = (angle: number) => Math.abs(angle - 0.5 * Math.PI) < eps;
-  const isMinusHalfPi = (angle: number) => Math.abs(0.5 * Math.PI + angle) < eps;
-  const isPiOrMinusPi = (angle: number) => (Math.abs(Math.PI - angle) < eps || Math.abs(Math.PI + angle) < eps);
-
-  if (isZero(z)) {
-    if (isZero(x)) return 1;
-    else if (isHalfPi(x)) return 4;
-    else if (isMinusHalfPi(x)) return 3;
-    else if (isPiOrMinusPi(x)) return 6;
-  } else if (isHalfPi(z)) {
-    return 2;
-  } else if (isMinusHalfPi(z)) {
-    return 5;
-  }
+  // Create rotation matrix from Euler angles
+  const euler = new THREE.Euler(rotation[0], rotation[1], rotation[2], 'XYZ');
+  const rotationMatrix = new THREE.Matrix4().makeRotationFromEuler(euler);
   
-  return 0; // Still rolling
+  // Transform face normals by rotation
+  const transformedNormals = faceNormals.map(normal => {
+    const transformed = normal.clone();
+    transformed.applyMatrix4(rotationMatrix);
+    return transformed;
+  });
+  
+  // Find which face normal is closest to pointing up (0, 1, 0)
+  const upVector = new THREE.Vector3(0, 1, 0);
+  let maxDot = -1;
+  let topFace = 1;
+  
+  transformedNormals.forEach((normal, index) => {
+    const dot = normal.dot(upVector);
+    if (dot > maxDot) {
+      maxDot = dot;
+      topFace = index + 1; // Face numbers are 1-indexed
+    }
+  });
+  
+  console.log('Face detection (improved):', {
+    rotation,
+    topFace,
+    maxDot: maxDot.toFixed(3),
+    transformedNormals: transformedNormals.map(n => ({
+      x: n.x.toFixed(3),
+      y: n.y.toFixed(3), 
+      z: n.z.toFixed(3)
+    }))
+  });
+  
+  return topFace;
 }
 
 // Floor component
@@ -268,19 +332,23 @@ function Floor() {
 
 interface ProfessionalDiceProps {
   onClose?: () => void;
+  onCommitToChain?: (rollCount: number, averageRoll: number, highestRoll: number) => void;
 }
 
-export default function ProfessionalDice({ onClose }: ProfessionalDiceProps) {
+export default function ProfessionalDice({ onClose, onCommitToChain }: ProfessionalDiceProps) {
   const [rolling, setRolling] = useState(false);
   const [results, setResults] = useState<number[]>([]);
   const [diceCount, setDiceCount] = useState(2);
   const [rollCount, setRollCount] = useState(0);
   const [allRolls, setAllRolls] = useState<number[]>([]);
+  const [committing, setCommitting] = useState(false);
+  const [lastCompletedRoll, setLastCompletedRoll] = useState<number | null>(null);
 
   const handleRoll = () => {
     setRolling(true);
     setResults([]);
     setRollCount(prev => prev + 1);
+    setLastCompletedRoll(null); // Reset last completed roll
     
     setTimeout(() => {
       setRolling(false);
@@ -288,17 +356,18 @@ export default function ProfessionalDice({ onClose }: ProfessionalDiceProps) {
   };
 
   const handleResult = (result: number, index: number) => {
+    console.log(`Dice ${index} result: ${result}`);
     setResults(prev => {
       const newResults = [...prev];
-      newResults[index] = result;
-      
-      // If all dice have settled, add the total to allRolls
-      if (newResults.length === diceCount && newResults.every(r => r > 0)) {
-        const total = newResults.reduce((sum, r) => sum + r, 0);
-        setAllRolls(prevRolls => [...prevRolls, total]);
+      // Only update if this dice hasn't already reported a result
+      if (newResults[index] === undefined || newResults[index] === 0) {
+        newResults[index] = result;
+        console.log('Updated results array:', newResults);
+        return newResults;
+      } else {
+        console.log(`Dice ${index} already has result ${newResults[index]}, ignoring new result ${result}`);
+        return prev; // Return previous state unchanged
       }
-      
-      return newResults;
     });
   };
 
@@ -308,6 +377,47 @@ export default function ProfessionalDice({ onClose }: ProfessionalDiceProps) {
   // Calculate statistics
   const averageRoll = allRolls.length > 0 ? (allRolls.reduce((sum, roll) => sum + roll, 0) / allRolls.length).toFixed(1) : '0.0';
   const highestRoll = allRolls.length > 0 ? Math.max(...allRolls) : 0;
+  
+  // Debug: Log the calculation details
+  console.log('Average calculation debug:', {
+    allRolls,
+    allRollsLength: allRolls.length,
+    sum: allRolls.length > 0 ? allRolls.reduce((sum, roll) => sum + roll, 0) : 0,
+    rawAverage: allRolls.length > 0 ? allRolls.reduce((sum, roll) => sum + roll, 0) / allRolls.length : 0,
+    formattedAverage: averageRoll
+  });
+
+  // Use useEffect to track when all dice have settled and add to allRolls
+  useEffect(() => {
+    console.log('useEffect triggered:', { allSettled, totalResult, results, diceCount, lastCompletedRoll });
+    if (allSettled && totalResult > 0 && lastCompletedRoll !== totalResult) {
+      console.log('Conditions met, updating allRolls');
+      setLastCompletedRoll(totalResult);
+      setAllRolls(prevRolls => {
+        const newRolls = [...prevRolls, totalResult];
+        console.log('Adding roll to history:', totalResult, 'New history:', newRolls);
+        return newRolls;
+      });
+    } else {
+      console.log('Conditions not met for adding roll:', {
+        allSettled,
+        totalResult,
+        lastCompletedRoll,
+        alreadyRecorded: lastCompletedRoll === totalResult
+      });
+    }
+  }, [allSettled, totalResult, lastCompletedRoll]);
+
+  // Debug logging for statistics
+  useEffect(() => {
+    console.log('Statistics update:', {
+      allRolls,
+      rollCount,
+      averageRoll,
+      highestRoll,
+      allRollsLength: allRolls.length
+    });
+  }, [allRolls, rollCount, averageRoll, highestRoll]);
 
   return (
     <div className="fixed inset-0 w-full h-full bg-gradient-to-b from-gray-900 to-black overflow-hidden z-10">
@@ -436,18 +546,42 @@ export default function ProfessionalDice({ onClose }: ProfessionalDiceProps) {
           )}
         </button>
 
-        {/* Reset Button */}
-        <button
-          onClick={() => {
-            setRollCount(0);
-            setResults([]);
-            setAllRolls([]);
-          }}
-          disabled={rolling}
-          className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 disabled:from-gray-500 disabled:to-gray-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 mb-4"
-        >
-          🔄 Reset All Stats
-        </button>
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button
+            onClick={() => {
+              setRollCount(0);
+              setResults([]);
+              setAllRolls([]);
+              setLastCompletedRoll(null);
+            }}
+            disabled={rolling || committing}
+            className="bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 disabled:from-gray-500 disabled:to-gray-600 text-white px-3 py-2 rounded-lg font-semibold text-xs transition-all duration-200"
+          >
+            🔄 Reset
+          </button>
+          
+          {onCommitToChain && rollCount > 0 && (
+            <button
+              onClick={async () => {
+                if (onCommitToChain) {
+                  setCommitting(true);
+                  try {
+                    await onCommitToChain(rollCount, parseFloat(averageRoll), highestRoll);
+                  } catch (error) {
+                    console.error('Failed to commit to chain:', error);
+                  } finally {
+                    setCommitting(false);
+                  }
+                }
+              }}
+              disabled={rolling || committing || rollCount === 0}
+              className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-500 disabled:to-gray-600 text-white px-3 py-2 rounded-lg font-semibold text-xs transition-all duration-200"
+            >
+              {committing ? '⏳' : '🔗'} {committing ? 'Saving...' : 'To Chain'}
+            </button>
+          )}
+        </div>
 
         {/* Statistics Display */}
         {rollCount > 0 && (
