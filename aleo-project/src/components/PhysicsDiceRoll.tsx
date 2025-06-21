@@ -32,6 +32,7 @@ const PhysicsDiceRoll: React.FC<PhysicsDiceRollProps> = ({ onRollComplete }) => 
   const [isRolling, setIsRolling] = useState(false);
   const [lastResults, setLastResults] = useState<number[]>([]);
   const [diceAmount, setDiceAmount] = useState(2);
+  const [rollCount, setRollCount] = useState(0);
 
   // Physics constants
   const fixedTimeStep = 1 / 120; // 120 Hz
@@ -294,6 +295,7 @@ const PhysicsDiceRoll: React.FC<PhysicsDiceRollProps> = ({ onRollComplete }) => 
   const rollDice = useCallback(() => {
     if (isRolling) return;
     setIsRolling(true);
+    setRollCount(prevCount => prevCount + 1);
     addDices();
   }, [isRolling, addDices]);
 
@@ -558,16 +560,21 @@ const PhysicsDiceRoll: React.FC<PhysicsDiceRollProps> = ({ onRollComplete }) => 
         <h3 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
           Physics Dice Roll
         </h3>
-        <div style={{ marginBottom: '10px' }}>
-          <label style={{ marginRight: '10px' }}>Dice:</label>
-          <select
-            value={diceAmount}
-            onChange={(e) => setDiceAmount(Number(e.target.value))}
-            style={{ padding: '5px', borderRadius: '4px' }}
-          >
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-          </select>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+          <div>
+            <label style={{ marginRight: '10px' }}>Dice:</label>
+            <select
+              value={diceAmount}
+              onChange={(e) => setDiceAmount(Number(e.target.value))}
+              style={{ padding: '5px', borderRadius: '4px' }}
+            >
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+            </select>
+          </div>
+          <div style={{ fontSize: '14px', fontWeight: 'bold' }}>
+            Rolls: {rollCount}
+          </div>
         </div>
         <button
           onClick={rollDice}
