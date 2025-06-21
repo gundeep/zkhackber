@@ -12,6 +12,7 @@ function App() {
   const [account, setAccount] = useState(null);
   const [executing, setExecuting] = useState(false);
   const [deploying, setDeploying] = useState(false);
+  const [showDice, setShowDice] = useState(true);
 
   const generateAccount = async () => {
     const key = await aleoWorker.getPrivateKey();
@@ -80,14 +81,24 @@ function App() {
         </div>
       </header>
 
+      {/* Dice Simulator - Full Screen */}
+      {showDice && <ProfessionalDice onClose={() => setShowDice(false)} />}
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Dice Simulator */}
-        <div className="mb-16">
-          <ProfessionalDice />
-        </div>
-
+        {/* Dice Simulator Button */}
+        {!showDice && (
+          <div className="mb-8 text-center">
+            <button
+              onClick={() => setShowDice(true)}
+              className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+            >
+              🎲 Open Dice Simulator
+            </button>
+          </div>
+        )}
+        
         {/* Aleo Demo Section */}
         <div className="bg-white rounded-xl shadow-lg p-8">
           <h3 className="text-2xl font-bold text-slate-900 mb-6 text-center">

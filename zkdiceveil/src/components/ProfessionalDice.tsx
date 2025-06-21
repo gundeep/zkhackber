@@ -266,14 +266,21 @@ function Floor() {
   );
 }
 
-export default function ProfessionalDice() {
+interface ProfessionalDiceProps {
+  onClose?: () => void;
+}
+
+export default function ProfessionalDice({ onClose }: ProfessionalDiceProps) {
   const [rolling, setRolling] = useState(false);
   const [results, setResults] = useState<number[]>([]);
   const [diceCount, setDiceCount] = useState(2);
+  const [rollCount, setRollCount] = useState(0);
+  const [allRolls, setAllRolls] = useState<number[]>([]);
 
   const handleRoll = () => {
     setRolling(true);
     setResults([]);
+    setRollCount(prev => prev + 1);
     
     setTimeout(() => {
       setRolling(false);
@@ -284,21 +291,33 @@ export default function ProfessionalDice() {
     setResults(prev => {
       const newResults = [...prev];
       newResults[index] = result;
+      
+      // If all dice have settled, add the total to allRolls
+      if (newResults.length === diceCount && newResults.every(r => r > 0)) {
+        const total = newResults.reduce((sum, r) => sum + r, 0);
+        setAllRolls(prevRolls => [...prevRolls, total]);
+      }
+      
       return newResults;
     });
   };
 
   const totalResult = results.reduce((sum, result) => sum + result, 0);
   const allSettled = results.length === diceCount && results.every(r => r > 0);
+  
+  // Calculate statistics
+  const averageRoll = allRolls.length > 0 ? (allRolls.reduce((sum, roll) => sum + roll, 0) / allRolls.length).toFixed(1) : '0.0';
+  const highestRoll = allRolls.length > 0 ? Math.max(...allRolls) : 0;
 
   return (
-    <div className="relative w-full h-screen bg-gradient-to-b from-gray-900 to-black overflow-hidden">
+    <div className="fixed inset-0 w-full h-full bg-gradient-to-b from-gray-900 to-black overflow-hidden z-10">
       {/* Full Screen 3D Canvas */}
       <Canvas
         shadows
         camera={{ position: [0, 4, 8], fov: 65 }}
         gl={{ antialias: true }}
         className="w-full h-full"
+        style={{ width: '100vw', height: '100vh' }}
       >
         <color attach="background" args={['#0a0a0a']} />
         
@@ -353,11 +372,22 @@ export default function ProfessionalDice() {
       
       {/* Floating Controls Panel - Top Left */}
       <div className="absolute top-6 left-6 bg-black/90 backdrop-blur-md text-white p-6 rounded-2xl shadow-2xl border border-white/20 min-w-80">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-          <h2 className="text-xl font-bold ml-4">🎲 Professional Dice</h2>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <h2 className="text-xl font-bold ml-4">🎲 Professional Dice</h2>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-white/60 hover:text-white transition-colors text-2xl leading-none"
+              title="Close dice simulator"
+            >
+              ×
+            </button>
+          )}
         </div>
         
         {/* Dice Count Control */}
@@ -380,6 +410,14 @@ export default function ProfessionalDice() {
           </div>
         </div>
 
+        {/* Roll Counter Display */}
+        <div className="mb-4 text-center">
+          <div className="bg-white/10 border border-white/20 rounded-lg p-3 backdrop-blur-sm">
+            <div className="text-white/70 text-sm font-medium mb-1">Total Rolls</div>
+            <div className="text-2xl font-bold text-blue-400">{rollCount}</div>
+          </div>
+        </div>
+
         {/* Roll Button */}
         <button
           onClick={handleRoll}
@@ -397,6 +435,36 @@ export default function ProfessionalDice() {
             </span>
           )}
         </button>
+
+        {/* Reset Button */}
+        <button
+          onClick={() => {
+            setRollCount(0);
+            setResults([]);
+            setAllRolls([]);
+          }}
+          disabled={rolling}
+          className="w-full bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 disabled:from-gray-500 disabled:to-gray-600 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all duration-200 mb-4"
+        >
+          🔄 Reset All Stats
+        </button>
+
+        {/* Statistics Display */}
+        {rollCount > 0 && (
+          <div className="bg-gradient-to-r from-purple-900/50 to-indigo-900/50 border border-purple-400/30 p-4 rounded-xl backdrop-blur-sm mb-4">
+            <div className="text-purple-300 font-semibold mb-3">📊 Statistics</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white/10 border border-purple-300/30 text-center py-2 px-3 rounded-lg backdrop-blur-sm">
+                <div className="text-xs text-purple-200 mb-1">Average</div>
+                <div className="text-lg font-bold text-purple-300">{averageRoll}</div>
+              </div>
+              <div className="bg-white/10 border border-purple-300/30 text-center py-2 px-3 rounded-lg backdrop-blur-sm">
+                <div className="text-xs text-purple-200 mb-1">Highest</div>
+                <div className="text-lg font-bold text-purple-300">{highestRoll}</div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Results Display */}
         {allSettled && (
@@ -433,7 +501,12 @@ export default function ProfessionalDice() {
       {/* Always Visible Sum Display - Bottom Center */}
       <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/90 backdrop-blur-md text-white p-6 rounded-2xl shadow-2xl border-2 border-blue-400/50 min-w-80">
         <div className="text-center">
-          <div className="text-blue-300 font-semibold mb-3">🎯 Current Results</div>
+          <div className="flex justify-between items-center mb-3">
+            <div className="text-blue-300 font-semibold">🎯 Current Results</div>
+            <div className="text-white/70 text-sm">
+              Rolls: <span className="text-blue-400 font-bold">{rollCount}</span>
+            </div>
+          </div>
           
           {results.length > 0 ? (
             <div>
