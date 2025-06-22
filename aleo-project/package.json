@@ -12,9 +12,13 @@
     "install-leo": "./install.sh"
   },
   "dependencies": {
+    "@demox-labs/aleo-wallet-adapter-base": "^0.0.23",
+    "@demox-labs/aleo-wallet-adapter-react": "^0.0.22",
+    "@demox-labs/aleo-wallet-adapter-reactui": "^0.0.36",
     "@provablehq/sdk": "^0.9.2",
     "@types/gsap": "^1.20.2",
     "@types/three": "^0.177.0",
+    "aleo-adapters": "^1.2.1",
     "comlink": "^4.4.2",
     "gsap": "^3.13.0",
     "oimo": "^1.0.9",

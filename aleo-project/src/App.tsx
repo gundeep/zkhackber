@@ -1,13 +1,17 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
 import aleoLogo from "./assets/aleo.svg";
 import "./App.css";
 import { AleoWorker } from "./workers/AleoWorker";
 import PhysicsDiceRoll from "./components/PhysicsDiceRoll";
 import playerDataProgram from "../player_data_9810/build/main.aleo?raw";
 
+import { WalletMultiButton } from "@demox-labs/aleo-wallet-adapter-reactui";
+import "@demox-labs/aleo-wallet-adapter-reactui/dist/styles.css";
+import { useWallet } from "@demox-labs/aleo-wallet-adapter-react";
+
 const aleoWorker = AleoWorker();
 function App() {
+  const { publicKey, requestTransaction, requestRecordPlaintexts } = useWallet();
   const [count, setCount] = useState(0);
   const [account, setAccount] = useState(null);
   const [executing, setExecuting] = useState(false);
@@ -18,6 +22,7 @@ function App() {
   const [rollCount, setRollCount] = useState(0);
   const [updating, setUpdating] = useState(false);
   const [lastCommittedRecord, setLastCommittedRecord] = useState<any>(null);
+  const [updatingAvgScore, setUpdatingAvgScore] = useState(false);
   const [showBetPrompt, setShowBetPrompt] = useState(false);
   const [showBetAmount, setShowBetAmount] = useState(false);
   const [selectedBetAmount, setSelectedBetAmount] = useState<number | null>(null);
@@ -63,23 +68,38 @@ function App() {
   async function commitPlayerResults() {
     setCommitting(true);
     try {
+      if (!requestTransaction || !publicKey) {
+        alert("Please connect your wallet first");
+        setCommitting(false);
+        return;
+      }
+
       const avgscore = diceResults.reduce((sum, val) => sum + val, 0);
       const miscdata = diceResults.length;
       const player_id = count;
       const bet_amount = selectedBetAmount || 0;
-      const result = await aleoWorker.localProgramExecution(
-        playerDataProgram,
-        "create_player_data",
-        [
-          `${avgscore}u32`,
-          `${miscdata}u32`,
-          `${player_id}u32`,
-          `${bet_amount}u32`
-        ]
-      );
+      
+      // Use wallet adapter for on-chain transaction
+      const result = await requestTransaction({
+        address: publicKey,
+        chainId: "testnetbeta",
+        transitions: [{
+          program: "player_data_9810.aleo",
+          functionName: "create_player_data",
+          inputs: [
+            `${avgscore}u32`,
+            `${miscdata}u32`,
+            `${player_id}u32`,
+            `${bet_amount}u32`
+          ]
+        }],
+        fee: 100000, // fees in microcredits
+        feePrivate: false,
+      });
+      
       setCommitResult(result);
       setLastCommittedRecord(result); // Store the record for potential updates
-      alert("Committed to chain! Result: " + JSON.stringify(result));
+      alert("Transaction submitted to chain! Transaction ID: " + result);
 
       // If Player 1, prep for Player 2
       if (playerNumber === 1) {
@@ -151,6 +171,70 @@ function App() {
     setUpdating(false);
   }
 
+  async function updateAverageScore() {
+    setUpdatingAvgScore(true);
+    try {
+      // Call update_avgscore with dummy hardcoded values
+      // Function signature: update_avgscore(player_data: PlayerData, public new_avgscore: u32)
+      const newAvgScore = 6; // Hardcoded dummy value
+      
+      // For testing, let's create a dummy record in the correct Leo format
+      // This should match the PlayerData record structure from your Leo program
+      const dummyRecord = `{
+        owner: aleo1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3ljyzc.private,
+        avgscore: 10u32.private,
+        miscdata: 2u32.private,
+        player_id: 1u32.private,
+        bet_amount: 50u32.private,
+        _nonce: 1234567890123456789012345678901234567890123456789012345678901234567890group.public
+      }`;
+      
+      console.log("Using dummy record for testing:", dummyRecord);
+      console.log("New avg score:", newAvgScore);
+      
+      const result = await aleoWorker.localProgramExecution(
+        playerDataProgram,
+        "update_avgscore",
+        [
+          dummyRecord, // Dummy PlayerData record in Leo format
+          `${newAvgScore}u32`   // New average score (hardcoded)
+        ]
+      );
+      
+      alert(`Average score updated successfully! New score: ${newAvgScore}\nResult: ` + JSON.stringify(result));
+      setLastCommittedRecord(result); // Update the stored record with the new result
+    } catch (e) {
+      console.error("Error details:", e);
+      alert("Error updating average score: " + e);
+    }
+    setUpdatingAvgScore(false);
+  }
+
+  async function requestPlayerRecords() {
+    if (!requestRecordPlaintexts) {
+      alert("No wallet connected");
+      return;
+    }
+    
+    try {
+      const records = await requestRecordPlaintexts('player_data_9810.aleo');
+      const unspentRecords = records.filter(record => !record.spent);
+
+      if (unspentRecords.length > 0) {
+        console.log("Unspent Player Records:");
+        unspentRecords.forEach((record, index) => {
+          console.log(`Record ${index + 1}:`, record.plaintext);
+        });
+        alert(`Found ${unspentRecords.length} unspent player records. Check console for details.`);
+      } else {
+        alert("No unspent player records found");
+      }
+    } catch (e) {
+      console.error("Error fetching records:", e);
+      alert("Error fetching player records: " + e);
+    }
+  }
+
   function resetForNextPlayer() {
     setDiceResults([]);
     setRollCount(0);
@@ -161,19 +245,18 @@ function App() {
 
   return (
     <>
+      <div style={{ position: 'absolute', top: '20px', right: '20px' }}>
+        <WalletMultiButton />
+      </div>
       <div>
         <a href="https://provable.com" target="_blank">
           <img src={aleoLogo} className="logo" alt="Aleo logo" />
         </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
       </div>
-      <h1>Aleo + React + Physics Dice</h1>
+      <h1>ZKDiceVeil</h1>
       
       {/* Physics Dice Roll Section */}
       <div className="card">
-        <h2>🎲 Realistic Physics Dice Roll</h2>
         <h2>
           {playerNumber === 1 ? "Player 1's Turn" : "Player 2's Turn"}
         </h2>
@@ -214,7 +297,6 @@ function App() {
                 disabled={updating || diceResults.length === 0} 
                 style={{
                   marginTop: '10px', 
-                  marginLeft: '10px',
                   padding: '10px 20px', 
                   fontSize: '16px',
                   background: 'linear-gradient(90deg, #28a745 0%, #20c997 100%)',
@@ -226,6 +308,28 @@ function App() {
                 }}
               >
                 {updating ? 'Updating...' : '🔄 Update Player Record'}
+              </button>
+            )}
+            {rollCount >= 1 && (
+              <button 
+                onClick={updateAverageScore} 
+                disabled={updatingAvgScore} 
+                style={{
+                  marginTop: '10px', 
+                  display: 'block',
+                  marginLeft: 'auto',
+                  marginRight: 'auto',
+                  padding: '10px 20px', 
+                  fontSize: '16px',
+                  background: 'linear-gradient(90deg, #ff8c00 0%, #ffa500 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: (updatingAvgScore || !lastCommittedRecord) ? 'not-allowed' : 'pointer',
+                  opacity: (updatingAvgScore || !lastCommittedRecord) ? 0.6 : 1
+                }}
+              >
+                {updatingAvgScore ? 'Updating...' : '📊 Update Average Score'}
               </button>
             )}
             {commitResult && (
@@ -248,6 +352,16 @@ function App() {
               : `Click to generate account`}
           </button>
         </p>
+        <p>
+          <button onClick={requestPlayerRecords}>
+            📋 Request Player Records
+          </button>
+        </p>
+        {publicKey && (
+          <p style={{ fontSize: '14px', color: '#666', wordBreak: 'break-all' }}>
+            Connected wallet: {publicKey}
+          </p>
+        )}
         {/* Removed execute button as helloworld_program is not used */}
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
@@ -290,7 +404,7 @@ function App() {
           >
             {deploying
               ? `Deploying...check console for details...`
-              : `🚀 Deploy player 1 results`}
+              : `🚀 Publish player 1 results On Chain`}
           </button>
         </p>
         {/* Bet Prompt Modal */}
@@ -411,7 +525,6 @@ function App() {
         )}
       </div>
       <p className="read-the-docs">
-        Click on the Aleo and React logos to learn more
       </p>
       {showPlayer2BetModal && (
         <div style={{
