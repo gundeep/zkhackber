@@ -1,4 +1,4 @@
-# Player Data Program
+# Player Data 9810 Program
 
 A Leo program for storing and managing two-player data using records on the Aleo blockchain. This program allows players to store their `avgscore` and `miscdata` while enabling other players to read this information.
 

@@ -1,5 +1,5 @@
 // The 'player_data' program.
-program player_data.aleo {
+program player_data_9810.aleo {
     
     // Record to store player data
     record PlayerData {
@@ -11,19 +11,23 @@ program player_data.aleo {
         miscdata: u32,
         // Player identifier/name (using u32 for simplicity)
         player_id: u32,
+        // Bet amount for this player
+        bet_amount: u32,
     }
 
     // Create initial player data
     transition create_player_data(
         public player_id: u32,
         public avgscore: u32,
-        public miscdata: u32
+        public miscdata: u32,
+        public bet_amount: u32
     ) -> PlayerData {
         return PlayerData {
             owner: self.caller,
             avgscore: avgscore,
             miscdata: miscdata,
             player_id: player_id,
+            bet_amount: bet_amount,
         };
     }
 
@@ -40,6 +44,7 @@ program player_data.aleo {
             avgscore: new_avgscore,
             miscdata: player_data.miscdata,
             player_id: player_data.player_id,
+            bet_amount: player_data.bet_amount,
         };
     }
 
@@ -56,6 +61,7 @@ program player_data.aleo {
             avgscore: player_data.avgscore,
             miscdata: new_miscdata,
             player_id: player_data.player_id,
+            bet_amount: player_data.bet_amount,
         };
     }
 
@@ -73,6 +79,26 @@ program player_data.aleo {
             avgscore: new_avgscore,
             miscdata: new_miscdata,
             player_id: player_data.player_id,
+            bet_amount: player_data.bet_amount,
+        };
+    }
+
+    // Update all player data including bet_amount
+    transition update_all_player_data(
+        player_data: PlayerData,
+        public new_avgscore: u32,
+        public new_miscdata: u32,
+        public new_bet_amount: u32
+    ) -> PlayerData {
+        // Ensure only the owner can update their own data
+        assert_eq(player_data.owner, self.caller);
+        
+        return PlayerData {
+            owner: player_data.owner,
+            avgscore: new_avgscore,
+            miscdata: new_miscdata,
+            player_id: player_data.player_id,
+            bet_amount: new_bet_amount,
         };
     }
 

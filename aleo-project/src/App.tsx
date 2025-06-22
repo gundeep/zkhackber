@@ -2,10 +2,9 @@ import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import aleoLogo from "./assets/aleo.svg";
 import "./App.css";
-import helloworld_program from "../helloworld/build/main.aleo?raw";
 import { AleoWorker } from "./workers/AleoWorker";
 import PhysicsDiceRoll from "./components/PhysicsDiceRoll";
-import playerDataProgram from "../player_data/build/main.aleo?raw";
+import playerDataProgram from "../player_data_9810/build/main.aleo?raw";
 
 const aleoWorker = AleoWorker();
 function App() {
@@ -17,36 +16,39 @@ function App() {
   const [committing, setCommitting] = useState(false);
   const [commitResult, setCommitResult] = useState<any>(null);
   const [rollCount, setRollCount] = useState(0);
+  const [updating, setUpdating] = useState(false);
+  const [lastCommittedRecord, setLastCommittedRecord] = useState<any>(null);
+  const [showBetPrompt, setShowBetPrompt] = useState(false);
+  const [showBetAmount, setShowBetAmount] = useState(false);
+  const [selectedBetAmount, setSelectedBetAmount] = useState<number | null>(null);
+  const [playerNumber, setPlayerNumber] = useState(1); // 1 or 2
+  const [player1Bet, setPlayer1Bet] = useState<number | null>(null);
+  const [player1Record, setPlayer1Record] = useState<any>(null); // Store Player 1's on-chain record if needed
+  const [isPlayer2Turn, setIsPlayer2Turn] = useState(false);
+  const [showPlayer2BetModal, setShowPlayer2BetModal] = useState(false);
 
   const generateAccount = async () => {
     const key = await aleoWorker.getPrivateKey();
     setAccount(await key.to_string());
   };
 
-  async function execute() {
-    setExecuting(true);
-    const result = await aleoWorker.localProgramExecution(
-      helloworld_program,
-      "main",
-      ["5u32", "5u32"],
-    );
-    setExecuting(false);
-
-    alert(JSON.stringify(result));
+  function handleDeployClick() {
+    setShowBetPrompt(true);
   }
 
   async function deploy() {
     setDeploying(true);
     try {
-      const result = await aleoWorker.deployProgram(helloworld_program);
+      const result = await aleoWorker.deployProgram(playerDataProgram);
       console.log("Transaction:")
       console.log("https://explorer.provable.com/transaction/" + result)
-      alert("Transaction ID: " + result);
+      alert("Transaction ID: " + result + (selectedBetAmount ? `\nBet Amount: ${selectedBetAmount} ALEO` : ''));
     } catch (e) {
       console.log(e)
       alert("Error with deployment, please check console for details");
     }
     setDeploying(false);
+    setSelectedBetAmount(null);
   }
 
   const handleDiceRollComplete = (results: number[]) => {
@@ -61,24 +63,99 @@ function App() {
   async function commitPlayerResults() {
     setCommitting(true);
     try {
-      // Example: avgscore = total of dice, miscdata = number of dice, player_id = count
       const avgscore = diceResults.reduce((sum, val) => sum + val, 0);
       const miscdata = diceResults.length;
       const player_id = count;
+      const bet_amount = selectedBetAmount || 0;
       const result = await aleoWorker.localProgramExecution(
         playerDataProgram,
         "create_player_data",
         [
           `${avgscore}u32`,
           `${miscdata}u32`,
-          `${player_id}u32`
+          `${player_id}u32`,
+          `${bet_amount}u32`
         ]
       );
       setCommitResult(result);
+      setLastCommittedRecord(result); // Store the record for potential updates
       alert("Committed to chain! Result: " + JSON.stringify(result));
+
+      // If Player 1, prep for Player 2
+      if (playerNumber === 1) {
+        setPlayer1Bet(bet_amount);
+        setPlayer1Record(result); // Save record if you want Player 2 to reference it
+        setPlayerNumber(2);
+        setIsPlayer2Turn(true);
+        setShowPlayer2BetModal(true);
+        resetForNextPlayer();
+      } else {
+        // If Player 2, you can show results or reset for a new game
+        alert("Player 2 has finished! Game over or reset as needed.");
+        // Optionally reset everything for a new game:
+        setPlayerNumber(1);
+        setPlayer1Bet(null);
+        setPlayer1Record(null);
+        setIsPlayer2Turn(false);
+        setShowPlayer2BetModal(false);
+        resetForNextPlayer();
+      }
     } catch (e) {
       alert("Error committing player results: " + e);
     }
+    setCommitting(false);
+  }
+
+  async function updatePlayerRecord() {
+    setUpdating(true);
+    try {
+      // Get current dice results for the update
+      const newAvgscore = diceResults.reduce((sum, val) => sum + val, 0);
+      const newMiscdata = diceResults.length;
+      const newBetAmount = selectedBetAmount || 0;
+      
+      let result;
+      
+      if (lastCommittedRecord) {
+        // Update existing record
+        result = await aleoWorker.localProgramExecution(
+          playerDataProgram,
+          "update_all_player_data",
+          [
+            lastCommittedRecord, // The record to update
+            `${newAvgscore}u32`,
+            `${newMiscdata}u32`,
+            `${newBetAmount}u32`
+          ]
+        );
+        alert("Record updated successfully! Result: " + JSON.stringify(result));
+      } else {
+        // Create new record
+        result = await aleoWorker.localProgramExecution(
+          playerDataProgram,
+          "create_player_data",
+          [
+            `${newAvgscore}u32`,
+            `${newMiscdata}u32`,
+            `${count}u32`,
+            `${newBetAmount}u32`
+          ]
+        );
+        alert("New record created successfully! Result: " + JSON.stringify(result));
+      }
+      
+      setLastCommittedRecord(result); // Update the stored record
+    } catch (e) {
+      alert("Error with player record operation: " + e);
+    }
+    setUpdating(false);
+  }
+
+  function resetForNextPlayer() {
+    setDiceResults([]);
+    setRollCount(0);
+    setCommitResult(null);
+    setSelectedBetAmount(null);
     setCommitting(false);
   }
 
@@ -97,8 +174,31 @@ function App() {
       {/* Physics Dice Roll Section */}
       <div className="card">
         <h2>🎲 Realistic Physics Dice Roll</h2>
+        <h2>
+          {playerNumber === 1 ? "Player 1's Turn" : "Player 2's Turn"}
+        </h2>
         <p>Experience true physics-based dice rolling with OIMO physics engine!</p>
         <PhysicsDiceRoll onRollComplete={handleDiceRollComplete} onRollCountChange={handleRollCountChange} />
+        {/* Debug info */}
+        <div style={{ marginTop: '10px', fontSize: '12px', color: '#666' }}>
+          Debug: rollCount = {rollCount}, diceResults.length = {diceResults.length}
+        </div>
+        {/* Test button - always visible */}
+        <button 
+          onClick={() => alert('Test button works!')} 
+          style={{
+            marginTop: '10px',
+            padding: '8px 16px',
+            fontSize: '14px',
+            background: '#ff6b6b',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          🧪 Test Button (Always Visible)
+        </button>
         {rollCount >= 1 && (
           <div style={{ marginTop: '15px', textAlign: 'center' }}>
             <h3>Last Roll Results</h3>
@@ -108,6 +208,26 @@ function App() {
             <button onClick={commitPlayerResults} disabled={committing} style={{marginTop: '10px', padding: '10px 20px', fontSize: '16px'}}>
               {committing ? 'Committing...' : 'Commit Player Results to Chain'}
             </button>
+            {rollCount >= 1 && (
+              <button 
+                onClick={updatePlayerRecord} 
+                disabled={updating || diceResults.length === 0} 
+                style={{
+                  marginTop: '10px', 
+                  marginLeft: '10px',
+                  padding: '10px 20px', 
+                  fontSize: '16px',
+                  background: 'linear-gradient(90deg, #28a745 0%, #20c997 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: updating ? 'not-allowed' : 'pointer',
+                  opacity: updating ? 0.6 : 1
+                }}
+              >
+                {updating ? 'Updating...' : '🔄 Update Player Record'}
+              </button>
+            )}
             {commitResult && (
               <div style={{marginTop: '10px', fontSize: '14px', color: 'green'}}>
                 Last commit result: {JSON.stringify(commitResult)}
@@ -128,13 +248,7 @@ function App() {
               : `Click to generate account`}
           </button>
         </p>
-        <p>
-          <button disabled={executing} onClick={execute}>
-            {executing
-              ? `Executing...check console for details...`
-              : `Execute helloworld.aleo`}
-          </button>
-        </p>
+        {/* Removed execute button as helloworld_program is not used */}
         <p>
           Edit <code>src/App.tsx</code> and save to test HMR
         </p>
@@ -151,7 +265,7 @@ function App() {
         <p>
           <button
             disabled={deploying}
-            onClick={deploy}
+            onClick={handleDeployClick}
             style={{
               padding: '18px 40px',
               fontSize: '1.4rem',
@@ -179,10 +293,169 @@ function App() {
               : `🚀 Deploy player 1 results`}
           </button>
         </p>
+        {/* Bet Prompt Modal */}
+        {showBetPrompt && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+            background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <div style={{ background: '#fff', padding: 40, borderRadius: 20, minWidth: 340, textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+              <h2 style={{marginBottom: 24, color: '#222'}}>Would you like to open a bet?</h2>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 28 }}>
+                <button
+                  onClick={() => { setShowBetPrompt(false); }}
+                  style={{
+                    padding: '12px 36px', fontSize: '1.15rem', borderRadius: 10, border: 'none',
+                    background: '#e0e0e0', color: '#333', fontWeight: 600, cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    transition: 'background 0.2s, color 0.2s',
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.background = '#cccccc'; }}
+                  onMouseOut={e => { e.currentTarget.style.background = '#e0e0e0'; }}
+                >No</button>
+                <button
+                  onClick={() => { setShowBetPrompt(false); setShowBetAmount(true); }}
+                  style={{
+                    padding: '12px 36px', fontSize: '1.15rem', borderRadius: 10, border: 'none',
+                    background: 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)', color: '#fff', fontWeight: 600, cursor: 'pointer',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #0056b3 0%, #00aaff 100%)'; }}
+                  onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)'; }}
+                >Yes</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Bet Amount Modal */}
+        {showBetAmount && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+            background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <div style={{ background: '#fff', padding: 40, borderRadius: 20, minWidth: 380, textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+              <h2 style={{marginBottom: 24, color: '#222'}}>Choose your bet amount</h2>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 28, alignItems: 'center' }}>
+                {/* 10 ALEO Button */}
+                <button
+                  onClick={() => {
+                    setSelectedBetAmount(10);
+                    setShowBetAmount(false);
+                    setTimeout(deploy, 200);
+                  }}
+                  style={{
+                    padding: '14px 32px', fontSize: '1.2rem', borderRadius: 8, border: 'none',
+                    background: 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)', color: '#fff', cursor: 'pointer', fontWeight: 'bold',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #0056b3 0%, #00aaff 100%)'; }}
+                  onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)'; }}
+                >
+                  10 ALEO
+                </button>
+                {/* 50 ALEO Button */}
+                <button
+                  onClick={() => {
+                    setSelectedBetAmount(50);
+                    setShowBetAmount(false);
+                    setTimeout(deploy, 200);
+                  }}
+                  style={{
+                    padding: '14px 32px', fontSize: '1.2rem', borderRadius: 8, border: 'none',
+                    background: 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)', color: '#fff', cursor: 'pointer', fontWeight: 'bold',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    transition: 'background 0.2s',
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #0056b3 0%, #00aaff 100%)'; }}
+                  onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)'; }}
+                >
+                  50 ALEO
+                </button>
+                {/* Custom ALEO Input */}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="number"
+                    min={1}
+                    placeholder="Custom"
+                    style={{
+                      padding: '12px 16px', fontSize: '1.1rem', borderRadius: 8, border: '1.5px solid #bdbdbd', width: 100, textAlign: 'center', marginBottom: 6
+                    }}
+                    id="custom-aleo-input"
+                  />
+                  <button
+                    onClick={() => {
+                      const val = parseInt((document.getElementById('custom-aleo-input') as HTMLInputElement)?.value, 10);
+                      if (!isNaN(val) && val > 0) {
+                        setSelectedBetAmount(val);
+                        setShowBetAmount(false);
+                        setTimeout(deploy, 200);
+                      }
+                    }}
+                    style={{
+                      padding: '8px 18px', fontSize: '1.05rem', borderRadius: 8, border: 'none',
+                      background: 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)', color: '#fff', cursor: 'pointer', fontWeight: 'bold',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                      transition: 'background 0.2s',
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #0056b3 0%, #00aaff 100%)'; }}
+                    onMouseOut={e => { e.currentTarget.style.background = 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)'; }}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <p className="read-the-docs">
         Click on the Aleo and React logos to learn more
       </p>
+      {showPlayer2BetModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{ background: '#fff', padding: 40, borderRadius: 20, minWidth: 340, textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}>
+            <h2 style={{marginBottom: 24, color: '#222'}}>
+              Player 1 placed a bet of <span style={{color:'#007bff'}}>{player1Bet} ALEO</span>.<br/>Do you accept this bet?
+            </h2>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 28 }}>
+              <button
+                onClick={() => {
+                  setShowPlayer2BetModal(false);
+                  // Player 2 can now roll dice and commit
+                }}
+                style={{
+                  padding: '12px 36px', fontSize: '1.15rem', borderRadius: 10, border: 'none',
+                  background: 'linear-gradient(90deg, #007bff 0%, #00c6ff 100%)', color: '#fff', fontWeight: 600, cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  transition: 'background 0.2s',
+                }}
+              >Accept</button>
+              <button
+                onClick={() => {
+                  setShowPlayer2BetModal(false);
+                  setPlayerNumber(1);
+                  setPlayer1Bet(null);
+                  setPlayer1Record(null);
+                  setIsPlayer2Turn(false);
+                  resetForNextPlayer();
+                  alert("Player 2 rejected the bet. Game reset.");
+                }}
+                style={{
+                  padding: '12px 36px', fontSize: '1.15rem', borderRadius: 10, border: 'none',
+                  background: '#e0e0e0', color: '#333', fontWeight: 600, cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  transition: 'background 0.2s, color 0.2s',
+                }}
+              >Reject</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

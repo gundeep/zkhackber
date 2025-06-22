@@ -9,6 +9,7 @@ import {
   NetworkRecordProvider,
 } from "@provablehq/sdk";
 import { expose, proxy } from "comlink";
+import playerDataProgram from "../player_data/build/main.aleo?raw";
 
 await initThreadPool();
 
@@ -42,7 +43,7 @@ async function deployProgram(program) {
 
   // Use existing account with funds
   const account = new Account({
-    privateKey: "user1PrivateKey",
+    privateKey: "APrivateKey1zkp8t7Utgn59pfmKPg7NvcmQKDURuNLiNK2rTTJ5Pb3QNac",
   });
 
   const recordProvider = new NetworkRecordProvider(account, networkClient);

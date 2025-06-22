@@ -1,5 +1,5 @@
 // The 'player_data' program.
-program player_data.aleo {
+program player_data_9810.aleo {
     
     // Record to store player data
     record PlayerData {
