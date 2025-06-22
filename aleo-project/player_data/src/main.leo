@@ -11,19 +11,23 @@ program player_data.aleo {
         miscdata: u32,
         // Player identifier/name (using u32 for simplicity)
         player_id: u32,
+        // Bet amount for this player
+        bet_amount: u32,
     }
 
     // Create initial player data
     transition create_player_data(
         public player_id: u32,
         public avgscore: u32,
-        public miscdata: u32
+        public miscdata: u32,
+        public bet_amount: u32
     ) -> PlayerData {
         return PlayerData {
             owner: self.caller,
             avgscore: avgscore,
             miscdata: miscdata,
             player_id: player_id,
+            bet_amount: bet_amount,
         };
     }
 
@@ -40,6 +44,7 @@ program player_data.aleo {
             avgscore: new_avgscore,
             miscdata: player_data.miscdata,
             player_id: player_data.player_id,
+            bet_amount: player_data.bet_amount,
         };
     }
 
@@ -56,6 +61,7 @@ program player_data.aleo {
             avgscore: player_data.avgscore,
             miscdata: new_miscdata,
             player_id: player_data.player_id,
+            bet_amount: player_data.bet_amount,
         };
     }
 
@@ -73,6 +79,7 @@ program player_data.aleo {
             avgscore: new_avgscore,
             miscdata: new_miscdata,
             player_id: player_data.player_id,
+            bet_amount: player_data.bet_amount,
         };
     }
 
