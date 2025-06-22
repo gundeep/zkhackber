@@ -1,5 +1,8 @@
 # zkhackber
 🎲 Aleo Dice Betting Game [ZKDiceVeil]
+
+![Dice Game](./assets/dice-game.png)
+
 Based on our development session, here's what we've built:
 
 Core Game Concept
