@@ -17,9 +17,10 @@ import { gsap } from 'gsap';
 
 interface PhysicsDiceRollProps {
   onRollComplete?: (results: number[]) => void;
+  onRollCountChange?: (count: number) => void;
 }
 
-const PhysicsDiceRoll: React.FC<PhysicsDiceRollProps> = ({ onRollComplete }) => {
+const PhysicsDiceRoll: React.FC<PhysicsDiceRollProps> = ({ onRollComplete, onRollCountChange }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -295,9 +296,13 @@ const PhysicsDiceRoll: React.FC<PhysicsDiceRollProps> = ({ onRollComplete }) => 
   const rollDice = useCallback(() => {
     if (isRolling) return;
     setIsRolling(true);
-    setRollCount(prevCount => prevCount + 1);
+    setRollCount(prevCount => {
+      const newCount = prevCount + 1;
+      if (onRollCountChange) onRollCountChange(newCount);
+      return newCount;
+    });
     addDices();
-  }, [isRolling, addDices]);
+  }, [isRolling, addDices, onRollCountChange]);
 
   // Reset camera position
   const resetCameraPosition = useCallback(() => {
